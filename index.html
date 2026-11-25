@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>喝水小卡</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      padding: 16px;
+      background: #edf5ff;
+      color: #172b45;
+      font-family: system-ui, "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    .water-card {
+      width: 100%;
+      max-width: 400px;
+      padding: 24px;
+      border: 1px solid #d6e4f3;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgb(23 43 69 / 8%);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 1.5rem;
+    }
+
+    .cup-count {
+      margin: 0 0 16px;
+      color: #425a75;
+    }
+
+    .cup-count strong {
+      color: #172b45;
+      font-size: 3rem;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    progress {
+      display: block;
+      width: 100%;
+      height: 12px;
+      overflow: hidden;
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: #e4edf7;
+      accent-color: #1764c0;
+    }
+
+    progress::-webkit-progress-bar {
+      background: #e4edf7;
+    }
+
+    progress::-webkit-progress-value {
+      border-radius: 999px;
+      background: #1764c0;
+    }
+
+    progress::-moz-progress-bar {
+      border-radius: 999px;
+      background: #1764c0;
+    }
+
+    .progress-status {
+      margin: 8px 0 24px;
+      color: #425a75;
+    }
+
+    .actions {
+      display: grid;
+      gap: 12px;
+    }
+
+    .button {
+      width: 100%;
+      min-height: 52px;
+      padding: 12px 16px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .button:focus-visible {
+      outline: 3px solid #1764c0;
+      outline-offset: 3px;
+    }
+
+    .button--primary {
+      min-height: 56px;
+      background: #1764c0;
+      color: #fff;
+      font-size: 1.125rem;
+    }
+
+    .button--secondary {
+      border-color: #c4d5e8;
+      background: #fff;
+      color: #25496f;
+    }
+
+    .button:disabled {
+      border-color: #dde5ee;
+      background: #f2f5f9;
+      color: #5e7085;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <main class="water-card" aria-labelledby="page-title">
+    <h1 id="page-title">喝水小卡</h1>
+
+    <p class="cup-count">
+      今日已喝 <strong id="cup-count">0</strong> / 8 杯
+    </p>
+
+    <progress
+      id="water-progress"
+      value="0"
+      max="8"
+      aria-label="今日喝水进度"
+    ></progress>
+
+    <p id="progress-status" class="progress-status" role="status">
+      还差 8 杯
+    </p>
+
+    <div class="actions">
+      <button id="add-cup" class="button button--primary" type="button">
+        +1 杯
+      </button>
+      <button id="undo-cup" class="button button--secondary" type="button" disabled>
+        撤销一杯
+      </button>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      todayCount: 0,
+      goal: 8,
+    };
+
+    const storageKey = 'water-card.daily-record';
+    const recordDate = getLocalDate();
+
+    const cupCount = document.getElementById('cup-count');
+    const waterProgress = document.getElementById('water-progress');
+    const progressStatus = document.getElementById('progress-status');
+    const addCupButton = document.getElementById('add-cup');
+    const undoCupButton = document.getElementById('undo-cup');
+
+    function getLocalDate() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    }
+
+    function loadTodayCount() {
+      try {
+        const record = JSON.parse(localStorage.getItem(storageKey));
+
+        if (record?.date === recordDate && Number.isInteger(record.count)) {
+          return Math.max(0, Math.min(record.count, state.goal));
+        }
+      } catch {
+        // 记录无法读取时，从 0 杯开始。
+      }
+
+      return 0;
+    }
+
+    function saveTodayCount() {
+      const record = {
+        date: recordDate,
+        count: state.todayCount,
+      };
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(record));
+      } catch {
+        // 存储不可用时，当前页面仍可继续计数。
+      }
+    }
+
+    function render() {
+      const { todayCount, goal } = state;
+      const remaining = goal - todayCount;
+
+      cupCount.textContent = String(todayCount);
+      waterProgress.max = goal;
+      waterProgress.value = Math.min(todayCount, goal);
+
+      progressStatus.textContent = remaining > 0
+        ? `还差 ${remaining} 杯`
+        : '今日已达标';
+
+      undoCupButton.disabled = todayCount === 0;
+    }
+
+    function handleAddCup() {
+      if (state.todayCount >= state.goal) {
+        progressStatus.textContent = `今日已达标，最多记录 ${state.goal} 杯`;
+        return;
+      }
+
+      state.todayCount += 1;
+      saveTodayCount();
+      render();
+    }
+
+    function handleUndoCup() {
+      if (state.todayCount <= 0) {
+        return;
+      }
+
+      state.todayCount -= 1;
+      saveTodayCount();
+      render();
+    }
+
+    state.todayCount = loadTodayCount();
+    render();
+
+    addCupButton.addEventListener('click', handleAddCup);
+    undoCupButton.addEventListener('click', handleUndoCup);
+  </script>
+</body>
+</html>
